@@ -1,0 +1,354 @@
+#cctbx.python diffuse.py pdb=ensemble.pdb probabilities=0.3,0.5,0.2 resolution=2.0 prefix='cypa'
+#Can use as_pdb_string() hierarchy method if want to write models out to PDB text files.
+import sys
+import iotbx
+from iotbx import pdb
+import math
+from cctbx.array_family import flex
+from cctbx import crystal
+from cctbx import miller
+from iotbx import scalepack
+from iotbx.scalepack import merge
+def run(arg):
+	args = get_input_dict(arg)
+
+	#This is a kludgy way of getting probabilities from the command line. Perhaps there's a better way?
+	#Probabilities need to be read in as 'probabilities=1,2,3,4,...'
+	probs = get_probabilities(args['probabilities'])
+
+	data = Ensemble(args['pdb'], int(args['sampling']), probs)
+
+	data.get_models()
+
+	for model in data.models:
+		model.get_structure_factors(float(args['resolution']))
+		model.weighted_structure_factors()
+		model.get_structure_factors_squared(float(args['resolution']))
+		model.weighted_structure_factors_squared()
+
+
+
+
+	diffuse = Diffuse(data.models, data.symmetry)
+
+	diffuse.calculate_map(int(args['sampling']), args['prefix'])
+	diffuse.extend_symmetry(1000000, args['prefix'])
+	diffuse.expand_friedel()
+
+
+class Ensemble:
+	'Class for all ensembles'
+
+	def __init__(self, pdb, sampling, probabilities=None):
+		#Split PDB into models and assign to model subclass (?)
+		#Strip out symmetry object of first PDB and assign?
+		self.pdb = iotbx.pdb.input(file_name=pdb)
+		self.hierarchy = self.pdb.construct_hierarchy()
+		self.symmetry = self.pdb.crystal_symmetry_from_cryst1()
+		self.probs = probabilities
+		self.sampling = sampling
+		self.expand_unit_cell()
+                print 'The __init__ works!'
+		self.get_xray_structures()
+		#self.xray = self.pdb.xray_structures_simple()
+		#print self.xray
+
+	def expand_unit_cell(self):
+		data = self.symmetry.as_py_code()
+		x = data.split(",")
+		y = x[0]
+		z=y.split("(")
+
+		q = x[5]
+		a=float(z[2])
+		b = float(x[1])
+		c = float(x[2])
+		A = int(x[3])
+		B = int(x[4])
+		C = int(q[:-1])
+
+		#Calculate new unit cell size
+		scale = int(self.sampling)
+		a_new = scale*a
+		b_new = scale*b
+		c_new = scale*c
+
+		#Create symmetry object with new unit cell parameters (since we're expanding into P1, we can pre-set the unit cell angles)
+		self.expanded_unit_cell = (a_new,b_new,c_new, 90, 90, 90)
+
+
+
+	def get_xray_structures(self):
+		self.xray_structures = self.pdb.xray_structures_simple(crystal_symmetry=self.symmetry)
+		#HERE, FOR STRUCTURE IN STRUCTURES, EXPAND STRUCTURE TO P1! (PAVEL'S E-MAIL)
+		self.p1_structures_no_expansion = list()
+		self.p1_pdb = list()
+		self.p1_structures = list()
+		count = 0
+                for structure in self.xray_structures:
+                	struc = structure.expand_to_p1()
+                	self.p1_structures_no_expansion.append(struc)
+
+
+
+                	full_struc = struc.customized_copy(unit_cell=self.expanded_unit_cell)
+                	self.p1_structures.append(full_struc)
+
+                	pdb_string = full_struc.as_pdb_file()
+                	file_name = 'model_%d_p1_full.pdb' %count
+                	open(file_name, 'w').write(pdb_string)
+                	self.p1_pdb.append(file_name)
+
+                 	count += 1
+
+
+        	#Can I now just do all subsequent calculations and skip the symmetry expansion components?
+        	#expand to P1, *then* make customized copy with expanded unit cell
+        	#Test by writing out as a PDB file using the as_pdb_file method
+	def get_models(self):
+		self.models = []
+		models = self.hierarchy.models()
+
+		weights = []
+
+		#This needs to be updated to just consider the probabilities
+		#This needs to be moved down to the models class???
+		if self.probs != None:
+			
+			for i in range(0,len(self.probs)):
+				d = float(self.probs[i])
+				weights.append(d)
+
+		else:
+			for model in models:
+				d = float(1/len(models))
+				weights.append(d)
+
+		i = 0
+		for model in models:
+			m = Model(model, self.symmetry, self.p1_structures[i], weights[i])
+			i += 1
+			self.models.append(m)
+
+
+	def diffuse_scattering(self):
+		return Diffuse(self.models, self.symmetry, sampling)
+
+
+class Model:
+	'Class for each model within an ensemble'
+	#Make model a subclass of ensemble?
+	#Need to re-average diffuse maps!!!
+	def __init__(self, model, symmetry, xray, probability):
+		self.model = model
+		self.probability = probability
+		self.symmetry = symmetry
+		self.xrs = xray
+
+
+	#def get_xray_structure(self,symm):
+		#print type(self.model)
+		#self.xrs = self.model.xray_structure_simple(crystal_symmetry=symm)
+
+
+	def get_structure_factors(self,resolution):
+		self.resolution = resolution
+		self.f = self.xrs.structure_factors(d_min=resolution).f_calc()
+
+	
+	def weighted_structure_factors(self):
+		self.f_weighted = self.f*self.probability
+
+	def get_structure_factors_squared(self,resolution):
+		self.resolution = resolution
+		fcalc = self.xrs.structure_factors(d_min=resolution).f_calc()
+		self.f_squared = abs(fcalc).set_observation_type_xray_amplitude().f_as_f_sq()
+
+
+	def weighted_structure_factors_squared(self):
+		self.f_squared_weighted = self.f_squared*self.probability
+
+
+
+class Diffuse:
+	'Class for all diffuse maps produced in reciprocal space'
+
+	def __init__(self, models, symmetry):
+
+		self.models = models
+		self.symmetry = symmetry
+		#self.resolution = resolution
+		#self.sampling = sampling
+
+		return
+
+
+	def calculate_map(self,sampling, prefix):
+		#Reads in list of Model objects and calculates <F>**2 and <F**2>
+		#<F>**2 will be calculated by adding the weighted structure factors together and squaring the sum
+		#<F**2> will be calculated by adding the weighted squared structure factors together
+
+		sum_fc = None
+		sum_fc_square = None
+
+		for model in self.models:
+			if sum_fc is None:
+				sum_fc = model.f_weighted
+				sum_fc_square = model.f_squared_weighted
+
+			else:
+				sum_fc = sum_fc + model.f_weighted
+				sum_fc_square = sum_fc_square + model.f_squared_weighted
+
+		avg_squared = abs(sum_fc).set_observation_type_xray_amplitude().f_as_f_sq()
+                print 'Heres sum_fc'
+                print list(sum_fc[100:103])
+                print 'Now heres sum_fc_squared!'
+                print list(sum_fc_square[100:103])
+		_sum_fc_square, _avg_squared = sum_fc_square.common_sets(avg_squared)
+  		self.diffuse_signal = _sum_fc_square.customized_copy(data = _sum_fc_square.data() - _avg_squared.data())
+
+  		self.write_squared_amplitudes(sampling, prefix, self.diffuse_signal)
+
+  	def  write_squared_amplitudes(self,sampling,prefix,array,out=sys.stdout):
+  	#Re-sizes reciprocal space lattice
+  	#sampling = input_dict.get('sampling',1)
+
+  		correction_factor = int(sampling)*int(sampling)*int(sampling)
+
+  		file_name=prefix+"_pre_symmetry.hkl"
+  		f=open(file_name,'w')
+  		lattice = dict()
+
+  		for hkl,intensity in array:
+  			h = hkl[0]
+  			k = hkl[1]
+  			l = hkl[2]
+  			h_new = float(h)/float(sampling)
+  			k_new = float(k)/float(sampling)
+  			l_new = float(l)/float(sampling)
+  			h_int = int(round(h_new+0.000000001))
+  			k_int = int(round(k_new+0.000000001))
+  			l_int = int(round(l_new+0.000000001))
+  			print h_int
+  			intensity_new = intensity/correction_factor
+  			if h_int not in lattice:
+  				lattice[h_int] = dict()
+
+  			if k_int not in lattice[h_int]:
+  				lattice[h_int][k_int] = dict()
+
+  			if l_int not in lattice[h_int][k_int]:
+  				lattice[h_int][k_int][l_int] = 0
+
+  			lattice[h_int][k_int][l_int] += intensity_new
+
+  		for key_h in lattice:
+  			for key_k in lattice[key_h]:
+  				for key_l in lattice[key_h][key_k]:
+  					print >>f, "%4d %4d %4d %4d" %(key_h, key_k, key_l, lattice[key_h][key_k][key_l])
+  		f.close()
+
+  		print >>out, "Wrote to %s" %(file_name)
+
+  		self.diffuse_file = file_name
+
+	def extend_symmetry(self,scale_factor,prefix):
+	#This reads in an hkl map and returns a .sca map
+		#Read in hkl file and populate miller array
+		inf = open(self.diffuse_file, 'r')
+		indices = flex.miller_index()
+		i_obs = flex.double()
+		sig_i = flex.double()
+		for line in inf.readlines():
+			assert len(line.split())==4
+			line = line.strip().split()
+			#####ATTENTION:SCALE FACTOR##############
+			i_obs_ = float(line[3])/scale_factor #is a uniform scale factor meant to re-size all diffuse intensities (normally too large for scalepack)
+			sig_i_ = math.sqrt(i_obs_) 
+			#if(abs(i_obs_)>1.e-6): # perhaps you don't want zeros
+			indices.append([int(line[0]),int(line[1]),int(line[2])])
+			i_obs.append(i_obs_)
+			sig_i.append(sig_i_)
+		inf.close()
+
+  	# get miller array object
+		cs = self.symmetry
+		ma = miller.array(miller_set=miller.set(cs, indices), data=i_obs, sigmas=sig_i)
+		ma.set_observation_type_xray_intensity()
+		ma_anom = ma.customized_copy(anomalous_flag=False)
+		#print ma_anom.anomalous_flag()
+		ma_p1 = ma_anom.expand_to_p1()
+
+		merge.write(file_name= prefix + '.sca', miller_array=ma_p1)
+
+		self.p1_map = prefix + '.sca'
+
+	def expand_friedel(self):
+	#This takes in a .sca map and outputs an hkl map with the Friedel pairs expanded
+		map_new = self.p1_map.rstrip('.sca')
+
+		fin = open(self.p1_map,'r')
+		fout = open(map_new + '.hkl', 'w')
+
+		lines = fin.readlines()
+
+		for line in lines:
+
+
+			data = line.split()
+
+			if len(data) == 5:
+
+				h = int(data[0])
+				h_new = -1*h
+				k = int(data[1])
+				k_new = -1*k
+				l = int(data[2])
+				l_new = -1*l
+				i = float(data[3])
+
+			#sig = data[4]
+
+				x_1 = (str(h)+ ' ' + str(k) + ' ' + str(l) + ' ' + str(i) + '\n')
+				x_2 = (str(h_new)+ ' ' + str(k_new) + ' ' + str(l_new) + ' ' + str(i) + '\n')
+
+				fout.write(x_1)
+				fout.write(x_2)
+
+		fin.close()
+		fout.close()
+
+		self.full_diffuse_map = map_new + '.hkl'
+
+def get_input_dict(args):
+	dic = dict()
+	for arg in args:
+		spl=arg.split('=')
+		if len(spl)==2:
+			dic[spl[0]] = spl[1]
+
+	return dic
+
+def get_probabilities(input):
+	data = input.split(',')
+
+	d_new = []
+
+	for d in data:
+		p_n = float(d)
+		d_new.append(p_n)
+
+	total = 0.0
+
+	for i in d_new:
+		total += i
+
+	print total	
+
+	return d_new
+
+if __name__ == '__main__':
+	import sys
+	args = sys.argv[1:]
+	run(args)
