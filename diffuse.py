@@ -6,6 +6,7 @@ from iotbx import pdb
 import math
 from cctbx.array_family import flex
 from cctbx import crystal
+from cctbx import xray
 from cctbx import miller
 from iotbx import scalepack
 from iotbx.scalepack import merge
@@ -18,22 +19,22 @@ def run(arg):
 
 	data = Ensemble(args['pdb'], int(args['sampling']), probs)
 
-	data.get_models()
+	#data.get_models()
 
-	for model in data.models:
-		model.get_structure_factors(float(args['resolution']))
-		model.weighted_structure_factors()
-		model.get_structure_factors_squared(float(args['resolution']))
-		model.weighted_structure_factors_squared()
-
-
+	#for model in data.models:
+		#model.get_structure_factors(float(args['resolution']))
+		#model.weighted_structure_factors()
+		#model.get_structure_factors_squared(float(args['resolution']))
+		#model.weighted_structure_factors_squared()
 
 
-	diffuse = Diffuse(data.models, data.symmetry)
 
-	diffuse.calculate_map(int(args['sampling']), args['prefix'])
-	diffuse.extend_symmetry(1000000, args['prefix'])
-	diffuse.expand_friedel()
+
+	#diffuse = Diffuse(data.models, data.symmetry)
+
+	#diffuse.calculate_map(int(args['sampling']), args['prefix'])
+	#diffuse.extend_symmetry(1000000, args['prefix'])
+	#diffuse.expand_friedel()
 
 
 class Ensemble:
@@ -47,8 +48,8 @@ class Ensemble:
 		self.symmetry = self.pdb.crystal_symmetry_from_cryst1()
 		self.probs = probabilities
 		self.sampling = sampling
-		self.expand_unit_cell()
-                print 'The __init__ works!'
+		#self.expand_unit_cell()
+                #print 'The __init__ works!'
 		self.get_xray_structures()
 		#self.xray = self.pdb.xray_structures_simple()
 		#print self.xray
@@ -74,7 +75,7 @@ class Ensemble:
 		c_new = scale*c
 
 		#Create symmetry object with new unit cell parameters (since we're expanding into P1, we can pre-set the unit cell angles)
-		self.expanded_unit_cell = (a_new,b_new,c_new, 90, 90, 90)
+		new_symmetry = self.expanded_unit_cell = self.symmetry.customized_copy(unit_cell = (a_new,b_new,c_new, 90, 90, 90))
 
 
 
@@ -83,23 +84,42 @@ class Ensemble:
 		#HERE, FOR STRUCTURE IN STRUCTURES, EXPAND STRUCTURE TO P1! (PAVEL'S E-MAIL)
 		self.p1_structures_no_expansion = list()
 		self.p1_pdb = list()
-		self.p1_structures = list()
+		self.p1_expanded = list()
 		count = 0
                 for structure in self.xray_structures:
                 	struc = structure.expand_to_p1()
-                	self.p1_structures_no_expansion.append(struc)
-
-
-
-                	full_struc = struc.customized_copy(unit_cell=self.expanded_unit_cell)
-                	self.p1_structures.append(full_struc)
-
-                	pdb_string = full_struc.as_pdb_file()
-                	file_name = 'model_%d_p1_full.pdb' %count
+                	pdb_string = struc.as_pdb_file()
+                	file_name = 'model_%d_p1.pdb' %count
                 	open(file_name, 'w').write(pdb_string)
                 	self.p1_pdb.append(file_name)
 
-                 	count += 1
+                	new_file = 'model_%d_p1_expanded.pdb' %count
+                	fin = open(file_name, 'r')
+                	fout = open(new_file, 'w')
+
+               		lines = fin.readlines()
+               		for line in lines:
+               			data = line.split()
+
+               			if data[0] == 'CRYST1':
+               				new_a = float(data[1])*self.sampling
+               				new_b = float(data[2])*self.sampling
+               				new_c = float(data[3])*self.sampling
+
+               				line_a = line.replace(data[1], str(new_a))
+               				line_b = line_a.replace(data[2], str(new_b))
+               				line_c = line_b.replace(data[3], str(new_c))
+               				fout.write(line_c)
+
+               			elif data[0] == 'SCALE1' or data[0] == 'SCALE2' or data[0] == 'SCALE3':
+               				continue
+
+               			else:
+               				fout.write(line)
+
+               		self.p1_expanded.append(new_file)
+
+               		count += 1
 
 
         	#Can I now just do all subsequent calculations and skip the symmetry expansion components?
