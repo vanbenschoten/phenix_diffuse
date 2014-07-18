@@ -19,40 +19,37 @@ def run(arg):
 
 	data = Ensemble(args['pdb'], int(args['sampling']), probs)
 
-	#data.get_models()
+	data.get_models()
 
-	#for model in data.models:
-		#model.get_structure_factors(float(args['resolution']))
-		#model.weighted_structure_factors()
-		#model.get_structure_factors_squared(float(args['resolution']))
-		#model.weighted_structure_factors_squared()
-
-
+	for model in data.models:
+		model.get_structure_factors(float(args['resolution']))
+		model.weighted_structure_factors()
+		model.get_structure_factors_squared(float(args['resolution']))
+		model.weighted_structure_factors_squared()
 
 
-	#diffuse = Diffuse(data.models, data.symmetry)
 
-	#diffuse.calculate_map(int(args['sampling']), args['prefix'])
-	#diffuse.extend_symmetry(1000000, args['prefix'])
-	#diffuse.expand_friedel()
+
+	diffuse = Diffuse(data.models, data.symmetry)
+
+	diffuse.calculate_map(int(args['sampling']), args['prefix'])
+	diffuse.extend_symmetry(1000, args['prefix'])
+	diffuse.expand_friedel()
 
 
 class Ensemble:
 	'Class for all ensembles'
 
 	def __init__(self, pdb, sampling, probabilities=None):
-		#Split PDB into models and assign to model subclass (?)
-		#Strip out symmetry object of first PDB and assign?
+
 		self.pdb = iotbx.pdb.input(file_name=pdb)
 		self.hierarchy = self.pdb.construct_hierarchy()
 		self.symmetry = self.pdb.crystal_symmetry_from_cryst1()
 		self.probs = probabilities
 		self.sampling = sampling
-		#self.expand_unit_cell()
-                #print 'The __init__ works!'
+		self.get_p1_expansion()
 		self.get_xray_structures()
-		#self.xray = self.pdb.xray_structures_simple()
-		#print self.xray
+
 
 	def expand_unit_cell(self):
 		data = self.symmetry.as_py_code()
@@ -79,57 +76,69 @@ class Ensemble:
 
 
 
-	def get_xray_structures(self):
+	def get_p1_expansion(self):
 		self.xray_structures = self.pdb.xray_structures_simple(crystal_symmetry=self.symmetry)
 		#HERE, FOR STRUCTURE IN STRUCTURES, EXPAND STRUCTURE TO P1! (PAVEL'S E-MAIL)
 		self.p1_structures_no_expansion = list()
 		self.p1_pdb = list()
 		self.p1_expanded = list()
 		count = 0
-                for structure in self.xray_structures:
-                	struc = structure.expand_to_p1()
-                	pdb_string = struc.as_pdb_file()
-                	file_name = 'model_%d_p1.pdb' %count
-                	open(file_name, 'w').write(pdb_string)
-                	self.p1_pdb.append(file_name)
+                print self.xray_structures
+		for structure in self.xray_structures:
+			struc = structure.expand_to_p1()
+			pdb_string = struc.as_pdb_file()
+			file_name = 'model_%d_p1.pdb' %count
+			open(file_name, 'w').write(pdb_string)
+                        print count
+			self.p1_pdb.append(file_name)
 
-                	new_file = 'model_%d_p1_expanded.pdb' %count
-                	fin = open(file_name, 'r')
-                	fout = open(new_file, 'w')
+			new_file = 'model_%d_p1_expanded.pdb' %count
+			fin = open(file_name, 'r')
+			fout = open(new_file, 'w')
+			lines = fin.readlines()
 
-               		lines = fin.readlines()
-               		for line in lines:
-               			data = line.split()
+			for line in lines:
+				data = line.split()
+				if data[0] == 'CRYST1':
+					new_a = float(data[1])*self.sampling
+					new_b = float(data[2])*self.sampling
+					new_c = float(data[3])*self.sampling
+                                        
+                                        #line_pre = line[:58]
+                                        #print len(line_pre)
+					#line_a = line_pre.replace(data[1], str(new_a))
+					#line_b = line_a.replace(data[2], str(new_b))
+					#line_c = line_b.replace(data[3], str(new_c))
+					#fout.write(line_c)
+                                        #print len(line_c)
+                                        c = 'CRYST1'
+                                        a = '90.00'
+                                        sg = 'P 1'
+                                        new_line = '%s%s%s%s%s%s%s%s' %(c.rjust(6), str(new_a).rjust(9), str(new_b).rjust(9), str(new_c).rjust(9), a.rjust(7), a.rjust(7), a.rjust(7), sg.rjust(12))
+                                        fout.write(new_line + '\n')
+                                        print new_line
 
-               			if data[0] == 'CRYST1':
-               				new_a = float(data[1])*self.sampling
-               				new_b = float(data[2])*self.sampling
-               				new_c = float(data[3])*self.sampling
+				elif data[0] == 'SCALE1' or data[0] == 'SCALE2' or data[0] == 'SCALE3':
+					continue
 
-               				line_a = line.replace(data[1], str(new_a))
-               				line_b = line_a.replace(data[2], str(new_b))
-               				line_c = line_b.replace(data[3], str(new_c))
-               				fout.write(line_c)
+				else:
+					fout.write(line)
 
-               			elif data[0] == 'SCALE1' or data[0] == 'SCALE2' or data[0] == 'SCALE3':
-               				continue
+			self.p1_expanded.append(new_file)
+			count += 1
 
-               			else:
-               				fout.write(line)
+	def get_xray_structures(self):
+		self.final_xray_structures = list()
 
-               		self.p1_expanded.append(new_file)
+    		for expansion in self.p1_expanded:
+    			pdb_inp = iotbx.pdb.input(file_name=expansion)
+    			st = pdb_inp.xray_structure_simple()
+    			self.final_xray_structures.append(st)
 
-               		count += 1
-
-
-        	#Can I now just do all subsequent calculations and skip the symmetry expansion components?
-        	#expand to P1, *then* make customized copy with expanded unit cell
-        	#Test by writing out as a PDB file using the as_pdb_file method
-	def get_models(self):
-		self.models = []
-		models = self.hierarchy.models()
-
-		weights = []
+    	def get_models(self):
+    		self.models = []
+    		models = self.hierarchy.models()
+    		weights = []
 
 		#This needs to be updated to just consider the probabilities
 		#This needs to be moved down to the models class???
@@ -146,7 +155,7 @@ class Ensemble:
 
 		i = 0
 		for model in models:
-			m = Model(model, self.symmetry, self.p1_structures[i], weights[i])
+			m = Model(model, self.symmetry, self.final_xray_structures[i], weights[i])
 			i += 1
 			self.models.append(m)
 
