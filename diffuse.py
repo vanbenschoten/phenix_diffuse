@@ -292,7 +292,7 @@ class Diffuse:
 
     def expand_friedel(self):
     #This takes in a .sca map and outputs an hkl map with the Friedel pairs expanded
-        map_new = self.p1_map.rstrip('.sca')
+        map_new = self.p1_map[:-4]
 
         fin = open(self.p1_map,'r')
         fout = open(map_new + '.hkl', 'w')
