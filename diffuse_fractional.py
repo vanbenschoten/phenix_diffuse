@@ -229,12 +229,12 @@ class Diffuse:
         lattice = dict()
 
         for hkl,intensity in array:
-            h_int = hkl[0]
-            k_int = hkl[1]
-            l_int = hkl[2]
-            #h_new = float(h)/float(sampling)
-            #k_new = float(k)/float(sampling)
-            #l_new = float(l)/float(sampling)
+            h = hkl[0]
+            k = hkl[1]
+            l = hkl[2]
+            h_int = float(h)/float(sampling)
+            k_int = float(k)/float(sampling)
+            l_int = float(l)/float(sampling)
             #h_int = int(round(h_new+0.000000001))
             #k_int = int(round(k_new+0.000000001))
             #l_int = int(round(l_new+0.000000001))
