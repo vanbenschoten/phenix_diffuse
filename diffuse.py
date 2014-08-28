@@ -224,7 +224,7 @@ class Diffuse:
 
         correction_factor = int(sampling)*int(sampling)*int(sampling)
 
-        file_name=prefix+"_pre_symmetry.hkl"
+        file_name=prefix+".hkl"
         f=open(file_name,'w')
         lattice = dict()
 
@@ -261,7 +261,7 @@ class Diffuse:
         self.diffuse_file = file_name
 
     def extend_symmetry(self,scale_factor,prefix):
-    #This reads in an hkl map and returns a .sca map
+    #This reads in an hkl map and returns a .mtz map
         #Read in hkl file and populate miller array
         inf = open(self.diffuse_file, 'r')
         indices = flex.miller_index()
@@ -283,49 +283,8 @@ class Diffuse:
         cs = self.symmetry
         ma = miller.array(miller_set=miller.set(cs, indices), data=i_obs, sigmas=sig_i)
         ma.set_observation_type_xray_intensity()
-        ma_anom = ma.customized_copy(anomalous_flag=False)
-        ma_p1 = ma_anom.expand_to_p1()
-
-        merge.write(file_name= prefix + '.sca', miller_array=ma_p1)
-
-        self.p1_map = prefix + '.sca'
-
-    def expand_friedel(self):
-    #This takes in a .sca map and outputs an hkl map with the Friedel pairs expanded
-        map_new = self.p1_map[:-4]
-
-        fin = open(self.p1_map,'r')
-        fout = open(map_new + '.hkl', 'w')
-
-        lines = fin.readlines()
-
-        for line in lines:
-
-
-            data = line.split()
-
-            if len(data) == 5:
-
-                h = int(data[0])
-                h_new = -1*h
-                k = int(data[1])
-                k_new = -1*k
-                l = int(data[2])
-                l_new = -1*l
-                i = float(data[3])
-
-            #sig = data[4]
-
-                x_1 = (str(h)+ ' ' + str(k) + ' ' + str(l) + ' ' + str(i) + '\n')
-                x_2 = (str(h_new)+ ' ' + str(k_new) + ' ' + str(l_new) + ' ' + str(i) + '\n')
-
-                fout.write(x_1)
-                fout.write(x_2)
-
-        fin.close()
-        fout.close()
-
-        self.full_diffuse_map = map_new + '.hkl'
+        mtz_dataset = ma.as_mtz_dataset(column_root_label="I")
+        mtz_dataset.mtz_object().write(prefix + '.mtz')
 
 def get_input_dict(args):
     dic = dict()
