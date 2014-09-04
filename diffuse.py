@@ -28,7 +28,6 @@ def run(arg):
 
     diffuse.calculate_map(int(args['sampling']), args['prefix'])
     diffuse.extend_symmetry(1000, args['prefix'])
-    diffuse.expand_friedel()
 
 
 class Ensemble:
