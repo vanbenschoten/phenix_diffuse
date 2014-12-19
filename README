@@ -1,6 +1,8 @@
-NOTE #1: this tool is released as a part of the PHENIX X-ray crystallography software suite (phenix-online.org). For further documentation see Van Benschoten et.al, 2014 (Acta Crystallographica, Section D).
+NOTE #1: this tool is released as a part of the PHENIX X-ray crystallography software suite (phenix-online.org). For further documentation see Van Benschoten et.al, 2015 (Acta Crystallographica, Section D).
 
-NOTE #2: this code is written within the framework of the Computational Crystallography Toolbox python library (http://cctbx.sourceforge.net/) and thus will not work with standard Python distributions
+NOTE #2: this code is written within the framework of the Computational Crystallography Toolbox python library (http://cctbx.sourceforge.net/) and thus will not work with standard Python distributions.
+
+NOTE #3: this program is bundled with Phenix program distributions #1894 and later.
 
 
 *****************************************************
