@@ -40,6 +40,8 @@ MTZ file containing diffuse scattering intensity values (I) at each Bragg peak
 
 
 #Authors
-Andrew Van Benschoten (andrew.vanbenschoten@ucsf.edu) **Primary Contact**
+Andrew Van Benschoten (andrew.vanbenschoten@ucsf.edu)
+
 Pavel Afonine (pafonine@lbl.gov)
+
 Alexandre Urzhumtsev (sacha@igbmr.fr)
