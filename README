@@ -1,28 +1,45 @@
-NOTE #1: this tool is released as a part of the PHENIX X-ray crystallography software suite (phenix-online.org). For further documentation see Van Benschoten et.al, 2015 (Acta Crystallographica, Section D).
+#Introduction
 
-NOTE #2: this code is written within the framework of the Computational Crystallography Toolbox python library (http://cctbx.sourceforge.net/) and thus will not work with standard Python distributions.
+phenix.diffuse uses Guinier’s equation to calculate diffuse scattering intensity maps from Protein Data Bank (PDB)-formatted structural ensembles. This program is released as a part of the PHENIX X-ray crystallography software suite (phenix-online.org) distributions #1894 and later. 
 
-NOTE #3: this program is bundled with Phenix program distributions #1894 and later.
+For further documentation see Van Benschoten et.al, 2015 (Acta Crystallographica, Section D).
+
+**NOTE:** This code is written within the framework of the Computational Crystallography Toolbox python library (http://cctbx.sourceforge.net/) and thus will not work with standard python distributions.
 
 
-*****************************************************
 
-Description
-This program calculates reciprocal space diffuse scattering maps from multi-model PDB ensembles.
+#Contents
 
-Output
-MTZ file containing diffuse scattering intensity values (I) at each Bragg peak
+diffuse.py:                  Final code checked in to Phenix distribution #1894
 
-Command line Usage
+diffuse_fractional.py:       Code for unit cell expansion calculations discussed in Van Benschoten et.al.
+
+diffuse_p1.py:               Positive control for diffuse_fractional.py
+
+
+
+*Instructions
+
+###Command line usage:###
 phenix.diffuse pdb=test.pdb probabilities=0.3,0.3,0.3,0.1 resolution=4.0 prefix=my_map
 
-pdb: input PDB file. At least one CRYST1 symmetry description is required.
 
-probabilities: the weighted probability for each model in the corresponding PDB file. The values listed in this option will be assigned to the PDB models starting with MODEL 0. Alternatively, leaving out the probabilities option will lead to equal weights for each model in the PDB file.
+###Program arguments###
+*pdb*: input PDB file. At least one CRYST1 symmetry description is required.
 
-resolution: the desired d_min for the output MTZ map
+*probabilities*: the weighted probability for each model in the corresponding PDB file. The values listed in this option will be assigned to the PDB models starting with MODEL 0. Alternatively, leaving out the probabilities option will lead to equal weights for each model in the PDB file.
 
-prefix: the desired MTZ file name
+*resolution*: the desired d_min for the output MTZ map
 
-Author
-Andrew Van Benschoten (andrew.vanbenschoten@ucsf.edu)
+*prefix*: the desired MTZ file name
+
+
+###Output###
+MTZ file containing diffuse scattering intensity values (I) at each Bragg peak
+
+
+
+#Authors
+Andrew Van Benschoten (andrew.vanbenschoten@ucsf.edu) **Primary Contact**
+Pavel Afonine (pafonine@lbl.gov)
+Alexandre Urzhumtsev (sacha@igbmr.fr)
