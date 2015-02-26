@@ -18,7 +18,7 @@ diffuse_p1.py:               Positive control for diffuse_fractional.py
 
 
 
-*Instructions
+#Instructions
 
 ###Command line usage:###
 phenix.diffuse pdb=test.pdb probabilities=0.3,0.3,0.3,0.1 resolution=4.0 prefix=my_map
